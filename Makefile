@@ -1,7 +1,7 @@
 
 # Image URL to use all building/pushing image targets
 IMG_REGISTRY ?= quay.io/open-cluster-management
-IMG_TAG ?= latest
+IMAGE_TAG ?= latest
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
 E2E_TEST_CLUSTER_NAME ?= loopback
@@ -108,11 +108,19 @@ rm -rf $$TMP_DIR ;\
 }
 endef
 
-image:
-	docker build -t ${IMG_REGISTRY}/managed-serviceaccount:latest -f Dockerfile .
+images:
+	docker build -t ${IMG_REGISTRY}/managed-serviceaccount:${IMAGE_TAG} -f Dockerfile .
 
 test-integration:
 	@echo "TODO: Run integration test"
 
 test-e2e: build-e2e
 	./bin/e2e --test-cluster $(E2E_TEST_CLUSTER_NAME)
+
+client-gen:
+	go install sigs.k8s.io/apiserver-runtime/tools/apiserver-runtime-gen@v1.1.1
+	go install k8s.io/code-generator/cmd/client-gen@v0.21.2
+	apiserver-runtime-gen \
+ 		--module open-cluster-management.io/managed-serviceaccount \
+ 		-g client-gen \
+ 		--versions=open-cluster-management.io/managed-serviceaccount/api/v1alpha1

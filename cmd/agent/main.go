@@ -26,8 +26,7 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	scheme = runtime.NewScheme()
 )
 
 func init() {
@@ -101,6 +100,21 @@ func main() {
 		klog.Fatal("unable to build a spoke kubernetes client")
 	}
 
+	resources, err := spokeNativeClient.Discovery().ServerResourcesForGroupVersion("v1")
+	if err != nil {
+		klog.Fatalf("Failed api discovery in the spoke cluster: %v", err)
+	}
+	found := false
+	for _, r := range resources.APIResources {
+		if r.Kind == "TokenRequest" {
+			found = true
+		}
+	}
+	if !found {
+		klog.Fatalf(`No "serviceaccounts/token" resource discovered in the managed cluster,` +
+			`is --service-account-signing-key-file configured for the kube-apiserver?`)
+	}
+
 	spokeNamespace := os.Getenv("NAMESPACE")
 	if len(spokeNamespace) == 0 {
 		inClusterNamespace, err := util.GetInClusterNamespace()
@@ -125,7 +139,10 @@ func main() {
 	if err != nil {
 		klog.Fatal("unable to instantiate a spoke serviceaccount cache")
 	}
-	mgr.Add(spokeCache)
+	err = mgr.Add(spokeCache)
+	if err != nil {
+		klog.Fatal("unable to add spoke cache to manager")
+	}
 
 	if err = (&controller.TokenReconciler{
 		Cache:             mgr.GetCache(),
