@@ -8,6 +8,9 @@ spec:
   selector:
     matchLabels:
       open-cluster-management.io/addon: managed-serviceaccount
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
   template:
     metadata:
       labels:
