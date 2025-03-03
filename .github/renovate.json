@@ -2,7 +2,7 @@
     "$schema": "https://docs.renovatebot.com/renovate-schema.json",
     "baseBranches": [
         "main",
-        "/^backplane-2\\.(5|6|7)$/"
+        "/^backplane-.*/"
     ],
     "packageRules": [
         {
@@ -32,9 +32,29 @@
                 "Dockerfile.rhtap"
             ],
             "enabled": true
+        },
+        {
+            "matchBaseBranches": [
+                "main"
+            ],
+            "matchManagers": [
+                "gomod"
+            ],
+            "enabled": false
+        },
+        {
+            "matchBaseBranches": [
+                "backplane-2.0",
+                "backplane-2.1",
+                "backplane-2.2",
+                "backplane-2.3",
+                "backplane-2.4"
+            ],
+            "enabled": false
         }
     ],
     "rebaseWhen": "behind-base-branch",
+    "recreateWhen": "never",
     "addLabels": [
         "ok-to-test"
     ],
