@@ -9,29 +9,18 @@
             "matchManagers": [
                 "dockerfile"
             ],
-            "matchFileNames": [
-                "Dockerfile"
-            ],
             "enabled": false
         },
         {
-            "matchManagers": [
-                "dockerfile"
-            ],
-            "matchFileNames": [
-                "Dockerfile.rhtap"
-            ],
-            "enabled": true
-        },
-        {
             "matchBaseBranches": [
-                "main"
+                "backplane-2.9",
+                "backplane-2.0",
+                "backplane-2.1",
+                "backplane-2.2",
+                "backplane-2.3",
+                "backplane-2.4"
             ],
-            "matchFileNames": [
-                ".tekton/**",
-                "Dockerfile.rhtap"
-            ],
-            "enabled": true
+            "enabled": false
         },
         {
             "matchBaseBranches": [
@@ -44,13 +33,31 @@
         },
         {
             "matchBaseBranches": [
-                "backplane-2.0",
-                "backplane-2.1",
-                "backplane-2.2",
-                "backplane-2.3",
-                "backplane-2.4"
+                "main"
             ],
-            "enabled": false
+            "matchManagers": [
+                "tekton"
+            ],
+            "enabled": true,
+            "addLabels": [
+                "lgtm"
+            ]
+        },
+        {
+            "matchBaseBranches": [
+                "backplane-2.8",
+                "backplane-2.7",
+                "backplane-2.6",
+                "backplane-2.5"
+            ],
+            "matchManagers": [
+                "gomod",
+                "tekton"
+            ],
+            "enabled": true,
+            "addLabels": [
+                "lgtm"
+            ]
         }
     ],
     "rebaseWhen": "behind-base-branch",
