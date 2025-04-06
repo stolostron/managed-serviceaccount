@@ -1,6 +1,8 @@
 module open-cluster-management.io/managed-serviceaccount
 
-go 1.20
+go 1.21
+
+toolchain go1.22.9
 
 require (
 	github.com/onsi/ginkgo/v2 v2.11.0
@@ -21,7 +23,7 @@ require (
 require (
 	github.com/BurntSushi/toml v1.2.1 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
-	github.com/Masterminds/semver/v3 v3.2.0 // indirect
+	github.com/Masterminds/semver/v3 v3.3.1 // indirect
 	github.com/Masterminds/sprig/v3 v3.2.3 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
