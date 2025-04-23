@@ -63,7 +63,8 @@
     "rebaseWhen": "behind-base-branch",
     "recreateWhen": "never",
     "addLabels": [
-        "ok-to-test"
+        "ok-to-test",
+        "approved"
     ],
     "schedule": "at any time"
 }
