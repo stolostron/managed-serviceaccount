@@ -2,7 +2,7 @@
     "$schema": "https://docs.renovatebot.com/renovate-schema.json",
     "baseBranches": [
         "main",
-        "/^backplane-.*/"
+        "/^backplane-2\\.[4-8]$/"
     ],
     "packageRules": [
         {
@@ -13,58 +13,35 @@
         },
         {
             "matchBaseBranches": [
-                "backplane-2.9",
-                "backplane-2.0",
-                "backplane-2.1",
-                "backplane-2.2",
-                "backplane-2.3",
-                "backplane-2.4"
+                "main",
+                "/^backplane-2\\.[4-8]$/"
             ],
-            "enabled": false
+            "matchManagers": [
+                "tekton"
+            ],
+            "enabled": true,
+            "addLabels": [
+                "ok-to-test",
+                "approved",
+                "lgtm"
+            ]
         },
         {
-            "matchBaseBranches": [
-                "main"
-            ],
             "matchManagers": [
                 "gomod"
             ],
-            "enabled": false
-        },
-        {
-            "matchBaseBranches": [
-                "main"
-            ],
-            "matchManagers": [
-                "tekton"
-            ],
-            "enabled": true,
-            "addLabels": [
-                "lgtm"
-            ]
-        },
-        {
-            "matchBaseBranches": [
-                "backplane-2.8",
-                "backplane-2.7",
-                "backplane-2.6",
-                "backplane-2.5"
-            ],
-            "matchManagers": [
-                "gomod",
-                "tekton"
-            ],
-            "enabled": true,
-            "addLabels": [
-                "lgtm"
-            ]
+            "enabled": false,
+            "groupName": "go dependencies",
+            "groupSlug": "go-deps"
         }
     ],
     "rebaseWhen": "behind-base-branch",
     "recreateWhen": "never",
     "addLabels": [
-        "ok-to-test",
-        "approved"
+        "ok-to-test"
     ],
-    "schedule": "at any time"
+    "timezone": "Asia/Shanghai",
+    "schedule": [
+        "every monday"
+    ]
 }
