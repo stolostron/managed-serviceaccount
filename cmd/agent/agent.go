@@ -224,6 +224,10 @@ func (o *AgentOptions) Run() error {
 		klog.Fatalf("unable to create controller %v", "ManagedServiceAccount")
 	}
 
+	klog.Infof("starting agent for cluster %s", o.ClusterName)
+	klog.Infof("agent configuration: metricsAddr=%s, probeAddr=%s, leaderElection=%v, spokeNamespace=%s",
+		o.MetricsAddr, o.ProbeAddr, o.EnableLeaderElection, spokeNamespace)
+
 	ctx, cancel := context.WithCancel(ctrl.SetupSignalHandler())
 	defer cancel()
 

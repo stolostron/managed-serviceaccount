@@ -238,6 +238,12 @@ func (o *HubManagerOptions) Run() error {
 	}
 
 	setupLog.Info("starting manager")
+	setupLog.Info("manager configuration",
+		"metricsAddr", o.MetricsAddr,
+		"probeAddr", o.ProbeAddr,
+		"leaderElection", o.EnableLeaderElection,
+		"agentImage", o.AddonAgentImageName,
+		"namespace", hubNamespace)
 
 	ctx, cancel := context.WithCancel(ctrl.SetupSignalHandler())
 	defer cancel()
