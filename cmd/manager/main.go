@@ -218,6 +218,7 @@ func main() {
 	}
 
 	setupLog.Info("starting manager")
+	setupLog.Info("managed-serviceaccount addon manager initialized", "namespace", hubNamespace, "agentImage", addonAgentImageName)
 
 	ctx, cancel := context.WithCancel(ctrl.SetupSignalHandler())
 	defer cancel()
