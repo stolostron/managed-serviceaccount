@@ -104,6 +104,8 @@ func (o *AgentOptions) Run() error {
 	klog.InitFlags(flag.CommandLine)
 	ctrl.SetLogger(logger)
 
+	klog.Infof("Starting managed-serviceaccount agent for cluster %s", o.ClusterName)
+
 	err := features.FeatureGates.SetFromMap(o.FeatureGatesFlags)
 	if err != nil {
 		klog.Fatalf("unable to set featuregates map: %v", err)
