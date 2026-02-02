@@ -64,6 +64,8 @@ func init() {
 }
 
 func main() {
+	klog.Info("Starting managed-serviceaccount manager")
+
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
