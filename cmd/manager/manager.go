@@ -123,6 +123,8 @@ func (o *HubManagerOptions) Run() error {
 	klog.InitFlags(flag.CommandLine)
 	ctrl.SetLogger(logger)
 
+	setupLog.Info("initializing managed-serviceaccount addon manager")
+
 	err := features.FeatureGates.SetFromMap(o.FeatureGatesFlags)
 	if err != nil {
 		setupLog.Error(err, "unable to set featuregates map")
