@@ -1,20 +1,13 @@
 approvers:
-- hanqiuzh
-- nathanweatherly
-- TheRealHaoLiu
-- tphee
-- elgnay
-- qiujian16
-# Temporary approvers added for Konflux migration to facilitate release repo prow config updates
-# These will be removed after the migration is complete
-- xuezhaojun
-- zhujian7
+- dhaiducek
+- jnpacker
+- mikeshng
+- rokej
+- tesshuflower
 
 reviewers:
-- hanqiuzh
-- nathanweatherly
-- TheRealHaoLiu
-- tphee
-- elgnay
-- qiujian16
-- zhujian7
+- dhaiducek
+- jnpacker
+- mikeshng
+- rokej
+- tesshuflower
