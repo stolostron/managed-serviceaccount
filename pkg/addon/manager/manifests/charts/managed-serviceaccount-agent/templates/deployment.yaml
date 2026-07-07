@@ -1,0 +1,67 @@
+{{- $image := include "managed-serviceaccount-common.agentImage" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: managed-serviceaccount-addon-agent
+  namespace: {{ .Values.addonInstallNamespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      addon-agent: managed-serviceaccount
+  template:
+    metadata:
+      labels:
+        addon-agent: managed-serviceaccount
+    spec:
+      serviceAccountName: managed-serviceaccount
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+{{- if .Values.NodeSelector }}
+      nodeSelector: {{ toYaml .Values.NodeSelector | nindent 8 }}
+{{- end }}
+{{- if .Values.Tolerations }}
+      tolerations: {{ toYaml .Values.Tolerations | nindent 8 }}
+{{- end }}
+      containers:
+        - name: addon-agent
+          image: {{ $image }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+              - ALL
+          command:
+            - /msa
+            - agent
+          args:
+            - --leader-elect=false
+            - --cluster-name={{ .Values.clusterName }}
+            - --kubeconfig=/etc/hub/kubeconfig
+            - --lease-health-check=true
+          ports:
+            - name: metrics
+              containerPort: 38080
+              protocol: TCP
+          volumeMounts:
+            - name: hub-kubeconfig
+              mountPath: /etc/hub/
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 2
+            periodSeconds: 10
+      volumes:
+        - name: hub-kubeconfig
+          secret:
+            secretName: {{ .Values.hubKubeConfigSecret }}
+{{- if .Values.imagePullSecretData }}
+      imagePullSecrets:
+      - name: open-cluster-management-image-pull-credentials
+{{- end }}

@@ -4,6 +4,7 @@ IMAGE_TAG ?= latest
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:crdVersions={v1},allowDangerousTypes=true,generateEmbeddedObjectMeta=true"
 E2E_TEST_CLUSTER_NAME ?= loopback
+HELM ?= helm
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -13,8 +14,10 @@ GOBIN=$(shell go env GOBIN)
 endif
 
 export DOCKER_BUILDER ?= docker
-export CGO_ENABLED = 1
+export CGO_ENABLED = 0
 export GOFLAGS ?=
+GO_BUILD_FLAGS ?= -a
+GO_BUILD_LDFLAGS ?=
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
@@ -65,15 +68,49 @@ envtest-setup:
 	$(eval export KUBEBUILDER_ASSETS=$(shell curl -fsSL $(ENSURE_ENVTEST_SCRIPT) | bash))
 	@echo "KUBEBUILDER_ASSETS=$(KUBEBUILDER_ASSETS)"
 
+.PHONY: sync-helm-dependencies
+sync-helm-dependencies: ## Sync local Helm chart dependencies into charts/ directories.
+	./hack/sync-helm-dependencies.sh
+
+.PHONY: verify-helm-dependencies
+verify-helm-dependencies: ## Verify Helm chart dependencies are committed and current.
+	./hack/verify-helm-dependencies.sh
+
+.PHONY: test
 test: manifests generate fmt vet envtest-setup ## Run tests.
 	go test ./pkg/... -coverprofile cover.out
+
+.PHONY: test-helm
+test-helm: verify-helm-dependencies ## Lint and render Helm charts.
+	$(HELM) lint charts/managed-serviceaccount
+	$(HELM) template managed-serviceaccount charts/managed-serviceaccount \
+		--namespace open-cluster-management-addon >/dev/null
+	$(HELM) template managed-serviceaccount charts/managed-serviceaccount \
+		--namespace open-cluster-management-addon \
+		--set featureGates.ephemeralIdentity=true \
+		--set featureGates.clusterProfile=true >/dev/null
+	$(HELM) template managed-serviceaccount charts/managed-serviceaccount \
+		--namespace open-cluster-management-addon \
+		--set hubDeployMode=AddOnTemplate >/dev/null
+	$(HELM) template managed-serviceaccount charts/managed-serviceaccount \
+		--namespace open-cluster-management-addon \
+		--set hubDeployMode=AddOnTemplate \
+		--set featureGates.ephemeralIdentity=true \
+		--set featureGates.clusterProfile=true >/dev/null
+	$(HELM) lint pkg/addon/manager/manifests/charts/managed-serviceaccount-agent
+	$(HELM) template managed-serviceaccount-agent pkg/addon/manager/manifests/charts/managed-serviceaccount-agent \
+		--namespace open-cluster-management-agent-addon >/dev/null
+	$(HELM) template managed-serviceaccount-agent pkg/addon/manager/manifests/charts/managed-serviceaccount-agent \
+		--namespace open-cluster-management-agent-addon \
+		--set Prometheus.Enabled=true \
+		--set imagePullSecretData=dGVzdA== >/dev/null
 
 ##@ Build
 
 build: generate fmt vet build-bin
 
 build-bin:
-	go build -a -o bin/msa cmd/main.go
+	go build $(GO_BUILD_FLAGS) $(if $(GO_BUILD_LDFLAGS),-ldflags="$(GO_BUILD_LDFLAGS)") -o bin/msa cmd/main.go
 
 build-e2e:
 	go test -c -o bin/e2e ./e2e/
@@ -132,10 +169,10 @@ rm -rf $$TMP_DIR ;\
 endef
 
 images:
-	$(DOCKER_BUILDER) build -t ${IMG_REGISTRY}/managed-serviceaccount:${IMAGE_TAG} -f Dockerfile .
+	$(DOCKER_BUILDER) build ${IMAGE_BUILD_EXTRA_FLAGS} -t ${IMG_REGISTRY}/managed-serviceaccount:${IMAGE_TAG} -f Dockerfile .
 
 images-amd64:
-	$(DOCKER_BUILDER) build --platform linux/amd64 -t ${IMG_REGISTRY}/managed-serviceaccount:${IMAGE_TAG} -f Dockerfile .
+	$(DOCKER_BUILDER) build --platform linux/amd64 ${IMAGE_BUILD_EXTRA_FLAGS} -t ${IMG_REGISTRY}/managed-serviceaccount:${IMAGE_TAG} -f Dockerfile .
 
 images-cp-creds:
 	$(DOCKER_BUILDER) build ${IMAGE_BUILD_EXTRA_FLAGS} -t ${IMG_REGISTRY}/cp-creds:${IMAGE_TAG} -f Dockerfile.cp-creds .

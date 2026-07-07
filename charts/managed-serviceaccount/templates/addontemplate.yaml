@@ -1,4 +1,5 @@
 {{- if eq .Values.hubDeployMode "AddOnTemplate" }}
+{{- $image := include "managed-serviceaccount-common.image" . }}
 apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: AddOnTemplate
 metadata:
@@ -56,6 +57,10 @@ spec:
               labels:
                 addon-agent: managed-serviceaccount
             spec:
+              securityContext:
+                runAsNonRoot: true
+                seccompProfile:
+                  type: RuntimeDefault
               containers:
               - args:
                 {{- if gt (int .Values.replicas) 1 }}
@@ -67,8 +72,18 @@ spec:
                 command:
                 - /msa
                 - agent
-                image: {{ .Values.image }}:{{ .Values.tag | default (print "v" .Chart.Version) }}
+                image: {{ $image }}
                 imagePullPolicy: IfNotPresent
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  readOnlyRootFilesystem: true
+                  capabilities:
+                    drop:
+                    - ALL
+                ports:
+                - name: metrics
+                  containerPort: 38080
+                  protocol: TCP
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -77,6 +92,40 @@ spec:
                   periodSeconds: 10
                 name: addon-agent
               serviceAccount: managed-serviceaccount
+      - apiVersion: v1
+        kind: Service
+        metadata:
+          name: managed-serviceaccount-addon-agent
+          namespace: open-cluster-management-agent-addon
+          labels:
+            addon-agent: managed-serviceaccount
+        spec:
+          selector:
+            addon-agent: managed-serviceaccount
+          ports:
+          - name: metrics
+            port: 38080
+            targetPort: metrics
+            protocol: TCP
+{{- if .Values.prometheus.enabled }}
+      - apiVersion: monitoring.coreos.com/v1
+        kind: ServiceMonitor
+        metadata:
+          name: managed-serviceaccount-addon-agent
+          namespace: open-cluster-management-agent-addon
+{{- with .Values.prometheus.serviceMonitor.labels }}
+          labels:
+{{- toYaml . | nindent 12 }}
+{{- end }}
+        spec:
+          endpoints:
+          - path: /metrics
+            scheme: http
+            port: metrics
+          selector:
+            matchLabels:
+              addon-agent: managed-serviceaccount
+{{- end }}
       - apiVersion: rbac.authorization.k8s.io/v1
         kind: Role
         metadata:

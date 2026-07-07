@@ -4,68 +4,125 @@ import (
 	"context"
 	"embed"
 	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"strconv"
 
+	certificatesv1 "k8s.io/api/certificates/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/utils/ptr"
 
 	"open-cluster-management.io/addon-framework/pkg/addonfactory"
 	"open-cluster-management.io/addon-framework/pkg/agent"
-	addonv1alpha1 "open-cluster-management.io/api/addon/v1alpha1"
+	addonutils "open-cluster-management.io/addon-framework/pkg/utils"
+	addonv1beta1 "open-cluster-management.io/api/addon/v1beta1"
 	clusterv1 "open-cluster-management.io/api/cluster/v1"
 	"open-cluster-management.io/managed-serviceaccount/pkg/common"
 )
 
-//go:embed manifests/templates
+const permissionName = "managed-serviceaccount-addon-agent"
+
+//go:embed all:manifests
 var FS embed.FS
 
+const (
+	prometheusEnabledVariableName              = "prometheusEnabled"
+	prometheusServiceMonitorLabelsVariableName = "prometheusServiceMonitorLabels"
+)
+
+type prometheusValues struct {
+	Enabled        bool
+	ServiceMonitor struct {
+		Labels map[string]string
+	}
+}
+
+var serviceMonitorGVK = schema.GroupVersionKind{
+	Group:   "monitoring.coreos.com",
+	Version: "v1",
+	Kind:    "ServiceMonitor",
+}
+
+// NewAgentScheme returns a scheme that registers ServiceMonitor as an unstructured type so
+// the agent's ServiceMonitor manifest can be decoded without depending on the prometheus-operator
+// API types.
+func NewAgentScheme() *runtime.Scheme {
+	s := runtime.NewScheme()
+	s.AddKnownTypeWithName(serviceMonitorGVK, &unstructured.Unstructured{})
+	return s
+}
+
 func GetDefaultValues(image string, imagePullSecret *corev1.Secret) addonfactory.GetValuesFunc {
-	return func(cluster *clusterv1.ManagedCluster, addon *addonv1alpha1.ManagedClusterAddOn) (addonfactory.Values, error) {
-		manifestConfig := struct {
-			ClusterName         string
-			Image               string
-			ImagePullSecretData string
-		}{
-			ClusterName: cluster.Name,
-			Image:       image,
+	return func(_ *clusterv1.ManagedCluster, _ *addonv1beta1.ManagedClusterAddOn) (addonfactory.Values, error) {
+		values := addonfactory.Values{
+			"Image": image,
 		}
 
 		if imagePullSecret != nil {
-			manifestConfig.ImagePullSecretData = base64.StdEncoding.EncodeToString(imagePullSecret.Data[corev1.DockerConfigJsonKey])
+			dockerConfig, ok := imagePullSecret.Data[corev1.DockerConfigJsonKey]
+			if !ok || len(dockerConfig) == 0 {
+				return nil, fmt.Errorf(
+					"image pull secret %s/%s missing %q",
+					imagePullSecret.Namespace,
+					imagePullSecret.Name,
+					corev1.DockerConfigJsonKey,
+				)
+			}
+			values["imagePullSecretData"] = base64.StdEncoding.EncodeToString(dockerConfig)
 		}
 
-		return addonfactory.StructToValues(manifestConfig), nil
+		return values, nil
 	}
+}
+
+// ToAddOnPrometheusValues maps the Prometheus customized variables of an
+// AddOnDeploymentConfig into the nested Prometheus values consumed by the agent manifests.
+func ToAddOnPrometheusValues(config addonv1beta1.AddOnDeploymentConfig) (addonfactory.Values, error) {
+	var prometheus prometheusValues
+	for _, variable := range config.Spec.CustomizedVariables {
+		switch variable.Name {
+		case prometheusEnabledVariableName:
+			enabled, err := strconv.ParseBool(variable.Value)
+			if err != nil {
+				return nil, fmt.Errorf("invalid %s: %w", prometheusEnabledVariableName, err)
+			}
+			prometheus.Enabled = enabled
+		case prometheusServiceMonitorLabelsVariableName:
+			if err := json.Unmarshal([]byte(variable.Value), &prometheus.ServiceMonitor.Labels); err != nil {
+				return nil, fmt.Errorf("invalid %s: %w", prometheusServiceMonitorLabelsVariableName, err)
+			}
+		}
+	}
+
+	if !prometheus.Enabled && len(prometheus.ServiceMonitor.Labels) == 0 {
+		return nil, nil
+	}
+
+	return addonfactory.Values{"Prometheus": addonfactory.StructToValues(prometheus)}, nil
 }
 
 func NewRegistrationOption(nativeClient kubernetes.Interface) *agent.RegistrationOption {
 	return &agent.RegistrationOption{
-		CSRConfigurations: agent.KubeClientSignerConfigurations(common.AddonName, common.AgentName),
-		CSRApproveCheck:   agent.ApprovalAllCSRs,
-		PermissionConfig:  setupPermission(nativeClient),
+		Configurations:   agent.KubeClientSignerConfigurations(common.AddonName, common.AgentName),
+		CSRApproveCheck:  approveAllCSRs,
+		PermissionConfig: setupPermission(nativeClient),
 	}
 }
 
+func approveAllCSRs(context.Context, *clusterv1.ManagedCluster, *addonv1beta1.ManagedClusterAddOn, *certificatesv1.CertificateSigningRequest) bool {
+	return true
+}
+
 func setupPermission(nativeClient kubernetes.Interface) agent.PermissionConfigFunc {
-	return func(cluster *clusterv1.ManagedCluster, addon *addonv1alpha1.ManagedClusterAddOn) error {
-		namespace := cluster.Name
-		agentUser := "system:open-cluster-management:cluster:" + cluster.Name + ":addon:managed-serviceaccount:agent:addon-agent"
+	return func(ctx context.Context, cluster *clusterv1.ManagedCluster, addon *addonv1beta1.ManagedClusterAddOn) error {
 		role := &rbacv1.Role{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "managed-serviceaccount-addon-agent",
-				Namespace: namespace,
-				OwnerReferences: []metav1.OwnerReference{
-					{
-						APIVersion:         "addon.open-cluster-management.io/v1alpha1",
-						Kind:               "ManagedClusterAddOn",
-						UID:                addon.UID,
-						Name:               addon.Name,
-						BlockOwnerDeletion: ptr.To(true),
-					},
-				},
+				Name: permissionName,
 			},
 			Rules: []rbacv1.PolicyRule{
 				{
@@ -85,48 +142,9 @@ func setupPermission(nativeClient kubernetes.Interface) agent.PermissionConfigFu
 				},
 			},
 		}
-		roleBinding := &rbacv1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "managed-serviceaccount-addon-agent",
-				Namespace: namespace,
-				OwnerReferences: []metav1.OwnerReference{
-					{
-						APIVersion:         "addon.open-cluster-management.io/v1alpha1",
-						Kind:               "ManagedClusterAddOn",
-						UID:                addon.UID,
-						Name:               addon.Name,
-						BlockOwnerDeletion: ptr.To(true),
-					},
-				},
-			},
-			RoleRef: rbacv1.RoleRef{
-				Kind: "Role",
-				Name: "managed-serviceaccount-addon-agent",
-			},
-			Subjects: []rbacv1.Subject{
-				{
-					Kind: rbacv1.UserKind,
-					Name: agentUser,
-				},
-			},
-		}
 
-		if _, err := nativeClient.RbacV1().Roles(namespace).Create(
-			context.TODO(),
-			role,
-			metav1.CreateOptions{}); err != nil {
-			if !apierrors.IsAlreadyExists(err) {
-				return err
-			}
-		}
-		if _, err := nativeClient.RbacV1().RoleBindings(namespace).Create(
-			context.TODO(),
-			roleBinding,
-			metav1.CreateOptions{}); err != nil {
-			if !apierrors.IsAlreadyExists(err) {
-				return err
-			}
-		}
-		return nil
+		return addonutils.NewRBACPermissionConfigBuilder(nativeClient).
+			BindKubeClientRole(role).
+			Build()(ctx, cluster, addon)
 	}
 }
