@@ -22,7 +22,7 @@ These files exist ONLY in the downstream fork and must be preserved during syncs
 - **`renovate.json`** -- Renovate bot config extending stolostron/acm-config
 - **`sonar-project.properties`** -- SonarQube code analysis config
 - **`Dockerfile.rhtap`** -- RHTAP/Konflux-oriented container build
-- **`OWNERS`** -- May have additional temporary approvers compared to upstream
+- **`OWNERS`** -- The downstream OWNERS lists the Red Hat ACM team, which is entirely different from the upstream community maintainers. Always preserve the stolostron version during syncs.
 
 ## Downstream-Only Commits
 
@@ -95,6 +95,8 @@ Resolution strategy:
 - For dependencies that exist in both repos: **take upstream's version** (source of truth)
 - For downstream-only dependencies (rare): keep them
 - Downstream-only files (`.tekton/`, `renovate.json`, etc.) should rarely conflict; keep the downstream copies
+- **`OWNERS`**: always keep the stolostron/downstream version -- the Red Hat team is entirely
+  different from the upstream community maintainers. Use `git checkout --ours OWNERS` to resolve.
 
 To resolve conflicts manually:
 
@@ -120,13 +122,81 @@ with open('go.sum', 'w') as f:
 "
 ```
 
-After dependency changes, regenerate vendor if the project vendors dependencies:
+### Step 5: Verify vendor integrity and build
+
+After resolving all conflicts, run these two commands to catch any remaining
+issues (e.g. leftover conflict markers in vendor files that `git add` won't
+detect, or files that `go mod vendor` would add/remove):
 
 ```bash
+# Re-sync vendor directory -- must produce no output (no changes)
 go mod vendor
+
+# Confirm the code compiles cleanly and passes linting
+make lint
 ```
 
-### Step 5: Verify downstream-only files
+If `go mod vendor` produces changes, stage and amend them into the merge commit
+before continuing. If `make lint` fails, trace the error back to the conflicted
+file and fix it.
+
+Also verify that no upstream commits were lost in the merge:
+
+```bash
+# upstream/main must be a reachable ancestor of your branch HEAD
+git merge-base --is-ancestor upstream/main HEAD && echo "OK - all upstream commits preserved" || echo "ERROR - upstream commits missing!"
+
+# Should print nothing (no commits in upstream that aren't in your branch)
+git log --oneline upstream/main --not HEAD
+```
+
+### Step 6: Update the RHTAP Dockerfile
+
+`Dockerfile.rhtap` is a downstream-only file that parallels the upstream `Dockerfile`. During a
+sync, first check whether the upstream `Dockerfile` was modified by any of the incoming commits:
+
+```bash
+git log --oneline upstream/main --not HEAD~ -- Dockerfile
+```
+
+If upstream changed its `Dockerfile` (new build stages, added dependencies, changed `COPY`/`RUN`
+instructions, etc.), evaluate whether `Dockerfile.rhtap` needs equivalent updates. The two files
+intentionally differ -- `Dockerfile.rhtap` uses Red Hat builder/runtime images and includes Red Hat
+`LABEL` blocks -- but structural build logic changes often need to be mirrored manually.
+
+If the upstream sync includes a **Go version bump** (check `go.mod` for a changed `go` directive),
+the RHTAP Dockerfile must also be updated manually -- it is downstream-only and won't be touched by
+the merge.
+
+```bash
+# Check current Go version in go.mod
+go list -m -json go
+
+# Check current version in the RHTAP Dockerfile
+grep -i "^FROM .* AS builder$" Dockerfile.rhtap
+```
+
+Update the builder FROM image tag in `Dockerfile.rhtap` to match the Go version in `go.mod`
+(e.g. `rhel_9_1.25` -> `rhel_9_1.26`):
+
+The builder image tag pattern is `rhel_<rhel-version>_<go-version>`, e.g.:
+
+```
+FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.26 AS builder
+```
+
+Note: the runtime base image (`ubi9/ubi-minimal`) and Red Hat `LABEL` blocks in `Dockerfile.rhtap`
+are intentionally different from the upstream Dockerfile and should **not** be changed to match
+upstream.
+
+Commit the Dockerfile change separately:
+
+```bash
+git add Dockerfile.rhtap
+git commit -s -S -m "chore: upgrade RHTAP Dockerfile to Go <version>"
+```
+
+### Step 7: Verify downstream-only files
 
 After resolving conflicts, verify these files still exist and are correct:
 
@@ -138,14 +208,18 @@ test -f Dockerfile.rhtap && echo Dockerfile.rhtap OK
 cat OWNERS
 ```
 
-### Step 6: Commit and push
+### Step 8: Commit and push
 
 ```bash
-git commit -m "Sync with upstream open-cluster-management-io/managed-serviceaccount $(date +%Y-%m-%d)"
+git commit -s -S -m "Sync with upstream open-cluster-management-io/managed-serviceaccount $(date +%Y-%m-%d)"
 git push origin sync-upstream-$(date +%Y%m%d)
 ```
 
 Then create a PR on GitHub targeting `main`.
+
+**Important:** When merging the PR, always use **"Create a merge commit"** -- not squash or
+rebase. This preserves the original upstream commit SHAs in the downstream history, making
+future syncs and divergence checks accurate.
 
 ## Handling Manual/Urgent Cherry-Picks
 

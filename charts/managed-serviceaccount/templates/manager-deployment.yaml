@@ -1,4 +1,5 @@
-{{- if or (ne .Values.hubDeployMode "AddOnTemplate") .Values.featureGates.clusterProfile }}
+{{- if include "managed-serviceaccount.hubManager.enabled" . }}
+{{- $image := include "managed-serviceaccount-common.image" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,10 +16,20 @@ spec:
         open-cluster-management.io/addon: managed-serviceaccount
     spec:
       serviceAccount: managed-serviceaccount
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: manager
-          image: {{ .Values.image }}:{{ .Values.tag | default (print "v" .Chart.Version) }}
+          image: {{ $image }}
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+              - ALL
           command:
             - /msa
             - manager
@@ -27,11 +38,16 @@ spec:
             - --leader-elect=true
             {{- end }}
             - --deploy-mode={{ .Values.hubDeployMode }}
-            - --agent-image-name={{ .Values.image }}:{{ .Values.tag | default (print "v" .Chart.Version) }}
+            - --metrics-bind-address=:38080
+            - --agent-image-name={{ $image }}
             {{- if .Values.featureGates }}
             - --feature-gates=EphemeralIdentity={{ .Values.featureGates.ephemeralIdentity | default false}},ClusterProfile={{ .Values.featureGates.clusterProfile | default false}}
-            {{- end}}
+            {{- end }}
             {{- if .Values.agentImagePullSecret }}
             - --agent-image-pull-secret={{ .Values.agentImagePullSecret }}
-            {{- end}}
+            {{- end }}
+          ports:
+            - name: metrics
+              containerPort: 38080
+              protocol: TCP
 {{- end }}
