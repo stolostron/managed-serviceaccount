@@ -4,7 +4,7 @@ COPY . .
 RUN go env
 RUN CGO_ENABLED=1 make build-bin
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+FROM registry.redhat.io/ubi9/ubi-minimal-pqc:latest
 LABEL \
     name="multicluster-engine/managed-serviceaccount-rhel9" \
     cpe="cpe:/a:redhat:multicluster_engine:2.11::el9" \
