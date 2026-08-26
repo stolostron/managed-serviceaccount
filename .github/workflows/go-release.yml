@@ -6,7 +6,6 @@ on:
       - 'v*.*.*'
 env:
   # Common versions
-  GO_VERSION: '1.23'
   GO_REQUIRED_MIN_VERSION: ''
   GITHUB_REF: ${{ github.ref }}
   CHART_NAME: managed-serviceaccount
@@ -47,7 +46,7 @@ jobs:
       - name: install Go
         uses: actions/setup-go@v2
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version-file: go.mod
       - name: install imagebuilder
         run: go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.3
       - name: pull base image
