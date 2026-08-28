@@ -19,3 +19,4 @@ LABEL \
     io.k8s.display-name="Red Hat Advanced Cluster Management Managed ServiceAccount" \
     io.openshift.tags="mce acm ocm managed-serviceaccount"
 COPY --from=builder /go/src/github.com/open-cluster-management.io/managed-serviceaccount/bin/msa /
+USER 65532:65532
