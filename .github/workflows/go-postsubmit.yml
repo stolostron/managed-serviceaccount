@@ -25,12 +25,12 @@ jobs:
         arch: [ amd64, arm64 ]
     steps:
       - name: checkout code
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 1
           path: go/src/open-cluster-management.io/managed-serviceaccount
       - name: install Go
-        uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # v2
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
       - name: install imagebuilder
@@ -52,7 +52,7 @@ jobs:
     needs: [ images ]
     steps:
       - name: checkout code
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 1
           path: go/src/open-cluster-management.io/managed-serviceaccount
