@@ -146,7 +146,7 @@ jobs:
         with:
           fetch-depth: 1
       - name: setup helm
-        uses: azure/setup-helm@v5
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
       - name: chart package
         run: |
           mkdir -p release
@@ -157,7 +157,7 @@ jobs:
         run: |
           echo "# Managed ServiceAccount ${{ needs.env.outputs.RELEASE_VERSION }}" > /home/runner/work/changelog.txt
       - name: publish release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:

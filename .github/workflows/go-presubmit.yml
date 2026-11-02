@@ -42,7 +42,7 @@ jobs:
       - name: unit
         run: make test
       - name: report coverage
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
         with:
           token: ${{ secrets.CODECOV_UPLOAD_TOKEN }}
           files: ./cover.out
@@ -77,7 +77,7 @@ jobs:
       - name: Install clusteradm
         run: curl -L https://raw.githubusercontent.com/open-cluster-management-io/clusteradm/main/install.sh | bash
       - name: Create k8s Kind Cluster
-        uses: helm/kind-action@v1.14.0
+        uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
       - name: Prepare OCM testing environment
         run: |
           clusteradm init --output-join-command-file join.sh --wait
@@ -113,7 +113,7 @@ jobs:
       - name: Install clusteradm
         run: curl -L https://raw.githubusercontent.com/open-cluster-management-io/clusteradm/main/install.sh | bash
       - name: Create k8s Kind Cluster
-        uses: helm/kind-action@v1.14.0
+        uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
       - name: Prepare OCM testing environment
         run: |
           clusteradm init --output-join-command-file join.sh --wait
